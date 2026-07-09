@@ -1,0 +1,1464 @@
+<!DOCTYPE html><html lang="en"><head><meta name="x-poe-datastore-behavior" content="local_only"><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DBD Strategy Board</title>
+  <style>
+    :root{
+      --bg: #0b0f17;
+      --panel: #121a2a;
+      --panel2:#0f1626;
+      --text:#e6edf7;
+      --muted:#9fb0cc;
+      --accent:#6aa7ff;
+      --danger:#ff5c7a;
+      --ok:#31d07f;
+      --warn:#ffcc66;
+      --grid:#22304d;
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius: 14px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--font);
+      background: radial-gradient(1000px 700px at 20% 10%, #142040 0%, var(--bg) 60%);
+      color:var(--text);
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    header{
+      padding:14px 16px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background: linear-gradient(to bottom, rgba(255,255,255,.04), rgba(255,255,255,0));
+      position:sticky; top:0; z-index:10;
+      backdrop-filter: blur(10px);
+    }
+    header h1{
+      font-size:16px; margin:0;
+      letter-spacing:.4px;
+    }
+    header .pill{
+      font-size:12px;
+      color:var(--muted);
+      padding:4px 10px;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      background:rgba(0,0,0,.15);
+    }
+    main{
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap:14px;
+      padding:14px;
+      flex:1;
+      min-height:0;
+    }
+    @media (max-width: 980px){
+      main{ grid-template-columns: 1fr; }
+    }
+    .panel{
+      background: linear-gradient(to bottom right, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      min-height:0;
+    }
+    .panel .section{
+      padding:14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.08);
+    }
+    .panel .section:last-child{ border-bottom:none; }
+    .section h2{
+      margin:0 0 10px 0;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:650;
+      letter-spacing:.6px;
+      text-transform:uppercase;
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row + .row{ margin-top:10px; }
+    label.small{
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+    }
+    input[type="file"]{ color:var(--muted); max-width:100%; }
+    button, .btn{
+      appearance:none;
+      border:none;
+      border-radius:12px;
+      padding:10px 12px;
+      background:rgba(255,255,255,.10);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:650;
+      font-size:13px;
+      border:1px solid rgba(255,255,255,.12);
+      transition:.15s ease;
+      user-select:none;
+    }
+    button:hover{ transform: translateY(-1px); background:rgba(255,255,255,.14); }
+    button:active{ transform: translateY(0px); }
+    button.primary{ background: rgba(106,167,255,.22); border-color: rgba(106,167,255,.45); }
+    button.primary:hover{ background: rgba(106,167,255,.30); }
+    button.danger{ background: rgba(255,92,122,.18); border-color: rgba(255,92,122,.45); }
+    button.ghost{ background: transparent; }
+    button:disabled{ opacity:.45; cursor:not-allowed; transform:none; }
+    .seg{
+      display:flex; gap:8px; flex-wrap:wrap;
+    }
+    .seg button{
+      padding:8px 10px;
+      font-size:12px;
+      border-radius:999px;
+    }
+    .seg button.active{
+      background: rgba(106,167,255,.28);
+      border-color: rgba(106,167,255,.55);
+    }
+
+    .canvasWrap{
+      position:relative;
+      min-height:520px;
+      height:100%;
+      overflow:hidden;
+      background:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 40px 40px;
+      background-position: 0 0;
+    }
+
+    /* Stage transforms all map+markers */
+    .stage{
+      position:absolute; inset:0;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    .map{
+      position:absolute;
+      left:0; top:0;
+      width:100%;
+      height:100%;
+      display:block;
+      object-fit: contain;
+      pointer-events:none;
+      user-select:none;
+      background: rgba(0,0,0,.18);
+    }
+
+    .hint{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:11px;
+      padding:2px 6px;
+      border:1px solid rgba(255,255,255,.18);
+      border-bottom-width:2px;
+      border-radius:8px;
+      background: rgba(0,0,0,.15);
+      color: var(--text);
+      white-space:nowrap;
+    }
+
+    /* Marker */
+    .marker{
+      position:absolute;
+      transform: translate(-50%, -50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+      font-weight:800;
+      border: 2px solid rgba(0,0,0,.45);
+      box-shadow: 0 6px 14px rgba(0,0,0,.28);
+      cursor: grab;
+      user-select:none;
+      touch-action:none;
+    }
+    .marker:active{ cursor:grabbing; }
+    .marker .tag{
+      position:absolute;
+      top: -10px;
+      left: 16px;
+      transform: translateY(-100%);
+      font-size:11px;
+      font-weight:700;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.55);
+      color: var(--text);
+      white-space:nowrap;
+      pointer-events:none;
+    }
+    .marker.gen{ background: rgba(255,204,102,.95); }
+    .marker.killer{ background: rgba(255,92,122,.92); }
+    .marker.surv{ background: rgba(49,208,127,.92); }
+
+    /* List */
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height: 260px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      background: rgba(0,0,0,.16);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+    }
+    .item .left{
+      display:flex; align-items:center; gap:10px; min-width:0;
+    }
+    .dot{
+      width:12px; height:12px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.25);
+      flex:0 0 auto;
+    }
+    .dot.gen{ background: var(--warn); }
+    .dot.killer{ background: var(--danger); }
+    .dot.surv{ background: var(--ok); }
+    .name{
+      font-size:13px;
+      font-weight:700;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 180px;
+    }
+    .sub{
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .item .actions{ display:flex; gap:8px; }
+    .item .actions button{
+      padding:8px 10px;
+      border-radius:10px;
+      font-size:12px;
+    }
+
+    /* Modal */
+    .modalBackdrop{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+    .modal{
+      width:min(560px, 100%);
+      background: linear-gradient(to bottom right, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:16px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modal header{
+      position:unset;
+      backdrop-filter:none;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.10);
+    }
+    .modal .body{ padding:14px; }
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-bottom:12px;
+    }
+    .field label{ font-size:12px; color:var(--muted); }
+    .field input, .field select{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      outline:none;
+    }
+    textarea{
+      width:100%;
+      min-height:140px;
+      resize:vertical;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      line-height:1.4;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DBD Strategy Board</h1>
+    <span class="pill">Import map → click to place markers → drag to adjust</span>
+  </header>
+
+  <main>
+    <!-- Left panel -->
+    <div class="panel">
+      <div class="section">
+        <h2>Map</h2>
+        <div class="row">
+          <input id="mapFile" type="file" accept="image/*">
+          <button id="clearMap" class="danger" title="Remove map image">Clear Map</button>
+        </div>
+        <div class="row">
+          <button id="fit" class="primary">Fit</button>
+          <button id="zoomIn">Zoom +</button>
+          <button id="zoomOut">Zoom −</button>
+          <button id="resetView" class="ghost">Reset view</button>
+        </div>
+        <div class="row">
+          <label class="small"><input id="toggleGrid" type="checkbox" checked=""> Show grid</label>
+          <label class="small"><input id="toggleLabels" type="checkbox" checked=""> Show labels</label>
+        </div>
+        <div class="hint">
+          Pan: hold <span class="kbd">Space</span> and drag (or middle-mouse drag).<br>
+          Place: select tool then click on map.<br>
+          Drag markers to move. Right-click a marker to delete.
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Place Tool</h2>
+        <div class="seg">
+          <button id="toolGen" class="active" data-tool="gen">Generator</button>
+          <button id="toolKiller" data-tool="killer">Killer</button>
+          <button id="toolSurv" data-tool="surv">Survivor</button>
+          <button id="toolSelect" data-tool="select">Select/Move</button>
+        </div>
+        <div class="row">
+          <button id="undo">Undo</button>
+          <button id="clearMarkers" class="danger">Clear markers</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Markers</h2>
+        <div class="list" id="markerList"></div>
+      </div>
+
+      <div class="section">
+        <h2>Save / Load</h2>
+        <div class="row">
+          <button id="exportJson" class="primary">Export JSON</button>
+          <button id="importJson">Import JSON</button>
+          <button id="copyJson">Copy JSON</button>
+          <button id="exportShareHtml" class="primary" title="Exports a standalone HTML that includes the map image + markers">Export Shareable HTML</button>
+        </div>
+        <div class="hint">
+          JSON includes marker positions and view transform. The map image itself is <b>not</b> embedded (keeps files small).<br>
+          <b>Export Shareable HTML</b> embeds the current map image (base64) + layout into a single file.
+        </div>
+      </div>
+    </div>
+
+    <!-- Board -->
+    <div class="panel canvasWrap" id="wrap">
+      <div class="stage" id="stage">
+        <img id="mapImg" class="map" alt="Map">
+        <div id="markerLayer"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: edit marker -->
+  <div class="modalBackdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <header>
+        <h1 style="font-size:14px;margin:0;">Edit Marker</h1>
+        <span class="pill" id="editIdPill">—</span>
+      </header>
+      <div class="body">
+        <div class="field">
+          <label for="editType">Type</label>
+          <select id="editType">
+            <option value="gen">Generator</option>
+            <option value="killer">Killer</option>
+            <option value="surv">Survivor</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="editLabel">Label</label>
+          <input id="editLabel" placeholder="e.g., Gen 1, Shack, S1, Killer">
+        </div>
+        <div class="row" style="justify-content:flex-end;">
+          <button id="deleteMarker" class="danger">Delete</button>
+          <button id="closeModal">Cancel</button>
+          <button id="saveMarker" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: JSON -->
+  <div class="modalBackdrop" id="jsonBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <header>
+        <h1 style="font-size:14px;margin:0;">Layout JSON</h1>
+        <span class="pill">paste to import / copy to save</span>
+      </header>
+      <div class="body">
+        <textarea id="jsonText" spellcheck="false"></textarea>
+        <div class="row" style="justify-content:flex-end;">
+          <button id="jsonCancel">Close</button>
+          <button id="jsonApply" class="primary">Apply (Import)</button>
+        </div>
+        <div class="hint">Tip: keep your map image file name consistent when sharing layouts.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- State ----------
+    // markers now store u,v normalized to the CONTAINED IMAGE rect (0..1).
+    // We keep legacy x,y for backwards compatibility when importing older JSON.
+    const state = {
+      tool: 'gen', // gen | killer | surv | select
+      markers: [], // {id, type, label, u, v, x?, y?}
+      nextId: 1,
+      view: { scale: 1, tx: 0, ty: 0 }, // stage transform
+      showGrid: true,
+      showLabels: true,
+      history: [],
+      map: { src: '', fileName: '', dataUrl: '' }
+    };
+
+    // ---------- DOM ----------
+    const wrap = document.getElementById('wrap');
+    const stage = document.getElementById('stage');
+    const markerLayer = document.getElementById('markerLayer');
+    const mapImg = document.getElementById('mapImg');
+    const markerList = document.getElementById('markerList');
+
+    const mapFile = document.getElementById('mapFile');
+    const clearMapBtn = document.getElementById('clearMap');
+
+    const toolButtons = [
+      document.getElementById('toolGen'),
+      document.getElementById('toolKiller'),
+      document.getElementById('toolSurv'),
+      document.getElementById('toolSelect'),
+    ];
+
+    const fitBtn = document.getElementById('fit');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const resetViewBtn = document.getElementById('resetView');
+    const toggleGrid = document.getElementById('toggleGrid');
+    const toggleLabels = document.getElementById('toggleLabels');
+
+    const undoBtn = document.getElementById('undo');
+    const clearMarkersBtn = document.getElementById('clearMarkers');
+
+    const exportJsonBtn = document.getElementById('exportJson');
+    const importJsonBtn = document.getElementById('importJson');
+    const copyJsonBtn = document.getElementById('copyJson');
+    const exportShareHtmlBtn = document.getElementById('exportShareHtml');
+
+    // Edit modal
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const editIdPill = document.getElementById('editIdPill');
+    const editType = document.getElementById('editType');
+    const editLabel = document.getElementById('editLabel');
+    const closeModalBtn = document.getElementById('closeModal');
+    const saveMarkerBtn = document.getElementById('saveMarker');
+    const deleteMarkerBtn = document.getElementById('deleteMarker');
+
+    // JSON modal
+    const jsonBackdrop = document.getElementById('jsonBackdrop');
+    const jsonText = document.getElementById('jsonText');
+    const jsonCancel = document.getElementById('jsonCancel');
+    const jsonApply = document.getElementById('jsonApply');
+
+    // ---------- Helpers ----------
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function uid(){ return state.nextId++; }
+
+    function snapshot(){
+      const snap = JSON.stringify({
+        markers: state.markers,
+        nextId: state.nextId,
+        view: state.view,
+        map: state.map,
+        showGrid: state.showGrid,
+        showLabels: state.showLabels
+      });
+      state.history.push(snap);
+      if (state.history.length > 60) state.history.shift();
+      undoBtn.disabled = state.history.length === 0;
+    }
+
+    function restoreFromSnapshot(snapStr){
+      const snap = JSON.parse(snapStr);
+      state.markers = snap.markers || [];
+      state.nextId = snap.nextId || 1;
+      state.view = snap.view || { scale:1, tx:0, ty:0 };
+      state.map = snap.map || { src:'', fileName:'', dataUrl:'' };
+      state.showGrid = !!snap.showGrid;
+      state.showLabels = snap.showLabels !== false;
+
+      toggleGrid.checked = state.showGrid;
+      toggleLabels.checked = state.showLabels;
+
+      applyMap();
+      applyView();
+      applyGrid();
+      normalizeLegacyMarkersInPlace();
+      renderMarkers();
+      renderList();
+    }
+
+    function setTool(tool){
+      state.tool = tool;
+      toolButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tool === tool));
+    }
+
+    function applyView(){
+      const { scale, tx, ty } = state.view;
+      stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    }
+
+    function applyGrid(){
+      wrap.style.background = state.showGrid
+        ? 'linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px)'
+        : 'rgba(0,0,0,.16)';
+      wrap.style.backgroundSize = state.showGrid ? '40px 40px' : 'auto';
+    }
+
+    function applyMap(){
+      mapImg.src = state.map.src || '';
+      mapImg.style.background = state.map.src ? 'transparent' : 'rgba(0,0,0,.18)';
+    }
+
+    // --- Key geometry: object-fit: contain rect, in STAGE coordinates (untransformed) ---
+    function getContainedImageRectStage(){
+      // Stage coords match wrap px coords when scale=1 and tx=ty=0.
+      const W = wrap.clientWidth;
+      const H = wrap.clientHeight;
+
+      // If image not loaded yet, treat as full rect
+      const iw = mapImg.naturalWidth || W || 1;
+      const ih = mapImg.naturalHeight || H || 1;
+
+      const scale = Math.min(W / iw, H / ih);
+      const w = iw * scale;
+      const h = ih * scale;
+      const x = (W - w) / 2;
+      const y = (H - h) / 2;
+      return { x, y, w, h };
+    }
+
+    function stagePointFromClient(clientX, clientY){
+      const rect = wrap.getBoundingClientRect();
+      const xw = clientX - rect.left;
+      const yw = clientY - rect.top;
+
+      const { scale, tx, ty } = state.view;
+      const xs = (xw - tx) / scale;
+      const ys = (yw - ty) / scale;
+      return { x: xs, y: ys };
+    }
+
+    function uvFromStagePoint(xs, ys){
+      const r = getContainedImageRectStage();
+      const u = (xs - r.x) / r.w;
+      const v = (ys - r.y) / r.h;
+      return { u: clamp(u, 0, 1), v: clamp(v, 0, 1) };
+    }
+
+    function stagePointFromUV(u, v){
+      const r = getContainedImageRectStage();
+      return { x: r.x + u * r.w, y: r.y + v * r.h };
+    }
+
+    function defaultLabelFor(type, n){
+      if (type === 'gen') return `Gen ${n}`;
+      if (type === 'killer') return `Killer`;
+      if (type === 'surv') return `S${n}`;
+      return `Marker ${n}`;
+    }
+
+    function markerEmoji(type){
+      if (type === 'gen') return 'G';
+      if (type === 'killer') return 'K';
+      return 'S';
+    }
+
+    function markerColorClass(type){
+      if (type === 'gen') return 'gen';
+      if (type === 'killer') return 'killer';
+      return 'surv';
+    }
+
+    function normalizeLegacyMarkersInPlace(){
+      // If older layouts used x,y (wrap/stage coords), convert them to u,v using current image rect.
+      // This is best-effort; for correct conversion, the same map image and wrap size should be used.
+      for (const m of state.markers){
+        const hasUV = Number.isFinite(m.u) && Number.isFinite(m.v);
+        const hasXY = Number.isFinite(m.x) && Number.isFinite(m.y);
+        if (!hasUV && hasXY){
+          const uv = uvFromStagePoint(m.x, m.y);
+          m.u = uv.u; m.v = uv.v;
+        }
+      }
+    }
+
+    function renderMarkers(){
+      markerLayer.innerHTML = '';
+      for (const m of state.markers){
+        const el = document.createElement('div');
+        el.className = `marker ${markerColorClass(m.type)}`;
+        el.dataset.id = m.id;
+        el.textContent = markerEmoji(m.type);
+
+        // Position derived from u,v
+        const { x, y } = stagePointFromUV(m.u ?? 0.5, m.v ?? 0.5);
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+
+        const tag = document.createElement('div');
+        tag.className = 'tag';
+        tag.textContent = m.label || '';
+        tag.style.display = state.showLabels ? 'block' : 'none';
+        el.appendChild(tag);
+
+        attachMarkerDrag(el);
+
+        el.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          snapshot();
+          state.markers = state.markers.filter(mm => mm.id !== m.id);
+          renderMarkers(); renderList();
+        });
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (state.tool !== 'select') return;
+          openEditModal(m.id);
+        });
+
+        markerLayer.appendChild(el);
+      }
+    }
+
+    function renderList(){
+      markerList.innerHTML = '';
+      const items = [...state.markers].sort((a,b)=>a.id-b.id);
+
+      if (items.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'hint';
+        empty.textContent = 'No markers yet. Select a tool then click on the map.';
+        markerList.appendChild(empty);
+        return;
+      }
+
+      for (const m of items){
+        const row = document.createElement('div');
+        row.className = 'item';
+
+        const left = document.createElement('div');
+        left.className = 'left';
+
+        const dot = document.createElement('div');
+        dot.className = `dot ${markerColorClass(m.type)}`;
+
+        const textWrap = document.createElement('div');
+        textWrap.style.minWidth = '0';
+
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = m.label || '(no label)';
+
+        const pt = stagePointFromUV(m.u ?? 0.5, m.v ?? 0.5);
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = `#${m.id} • ${m.type.toUpperCase()} • (u:${(m.u??0).toFixed(3)}, v:${(m.v??0).toFixed(3)}) • px(${Math.round(pt.x)}, ${Math.round(pt.y)})`;
+
+        textWrap.appendChild(name);
+        textWrap.appendChild(sub);
+
+        left.appendChild(dot);
+        left.appendChild(textWrap);
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const focusBtn = document.createElement('button');
+        focusBtn.textContent = 'Focus';
+        focusBtn.addEventListener('click', () => focusMarker(m));
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'primary';
+        editBtn.addEventListener('click', () => openEditModal(m.id));
+
+        actions.appendChild(focusBtn);
+        actions.appendChild(editBtn);
+
+        row.appendChild(left);
+        row.appendChild(actions);
+
+        markerList.appendChild(row);
+      }
+    }
+
+    function focusMarker(m){
+      const rect = wrap.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+
+      const { x, y } = stagePointFromUV(m.u ?? 0.5, m.v ?? 0.5);
+      const { scale } = state.view;
+
+      snapshot();
+      state.view.tx = cx - scale * x;
+      state.view.ty = cy - scale * y;
+      applyView();
+    }
+
+    // ---------- Marker Drag (updates u,v) ----------
+    function attachMarkerDrag(el){
+      let dragging = false;
+      let start = { mx:0, my:0, u:0, v:0 };
+      const id = Number(el.dataset.id);
+
+      el.addEventListener('pointerdown', (e) => {
+        if (isPanningMode(e)) return;
+        e.preventDefault();
+        el.setPointerCapture(e.pointerId);
+        dragging = true;
+
+        const m = state.markers.find(mm => mm.id === id);
+        if (!m) return;
+        snapshot();
+
+        start.mx = e.clientX;
+        start.my = e.clientY;
+        start.u = m.u ?? 0.5;
+        start.v = m.v ?? 0.5;
+      });
+
+      el.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+
+        // Convert the CURRENT pointer client position -> stage point -> uv
+        const pt = stagePointFromClient(e.clientX, e.clientY);
+        const uv = uvFromStagePoint(pt.x, pt.y);
+
+        const m = state.markers.find(mm => mm.id === id);
+        if (!m) return;
+        m.u = uv.u;
+        m.v = uv.v;
+
+        const xy = stagePointFromUV(m.u, m.v);
+        el.style.left = xy.x + 'px';
+        el.style.top = xy.y + 'px';
+        renderList();
+      });
+
+      el.addEventListener('pointerup', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+      });
+    }
+
+    // ---------- Panning / Zooming ----------
+    let keys = new Set();
+    window.addEventListener('keydown', (e) => {
+      keys.add(e.code);
+      if (e.code === 'Space') e.preventDefault();
+    }, {passive:false});
+    window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+    function isPanningMode(e){
+      return keys.has('Space') || e.button === 1;
+    }
+
+    let pan = { active:false, sx:0, sy:0, ox:0, oy:0 };
+
+    wrap.addEventListener('pointerdown', (e) => {
+      if (isPanningMode(e)) {
+        e.preventDefault();
+        wrap.setPointerCapture(e.pointerId);
+        pan.active = true;
+        pan.sx = e.clientX;
+        pan.sy = e.clientY;
+        pan.ox = state.view.tx;
+        pan.oy = state.view.ty;
+        return;
+      }
+    });
+
+    wrap.addEventListener('pointermove', (e) => {
+      if (!pan.active) return;
+      const dx = e.clientX - pan.sx;
+      const dy = e.clientY - pan.sy;
+      state.view.tx = pan.ox + dx;
+      state.view.ty = pan.oy + dy;
+      applyView();
+    });
+
+    wrap.addEventListener('pointerup', (e) => {
+      if (!pan.active) return;
+      pan.active = false;
+      try{ wrap.releasePointerCapture(e.pointerId); }catch(_){}
+    });
+
+    // Place marker on click (store u,v)
+    wrap.addEventListener('click', (e) => {
+      if (state.tool === 'select') return;
+
+      // If map not loaded (no natural size), fall back to stage coords centered
+      if (!mapImg.naturalWidth || !mapImg.naturalHeight){
+        const pt = stagePointFromClient(e.clientX, e.clientY);
+        const uv = uvFromStagePoint(pt.x, pt.y);
+
+        snapshot();
+        const type = state.tool;
+        const id = uid();
+        const countOfType = state.markers.filter(m => m.type === type).length + 1;
+
+        state.markers.push({ id, type, label: defaultLabelFor(type, countOfType), u: uv.u, v: uv.v });
+        renderMarkers(); renderList();
+        return;
+      }
+
+      const pt = stagePointFromClient(e.clientX, e.clientY);
+      const uv = uvFromStagePoint(pt.x, pt.y);
+
+      snapshot();
+      const type = state.tool;
+      const id = uid();
+      const countOfType = state.markers.filter(m => m.type === type).length + 1;
+
+      state.markers.push({
+        id,
+        type,
+        label: defaultLabelFor(type, countOfType),
+        u: uv.u,
+        v: uv.v
+      });
+
+      renderMarkers();
+      renderList();
+    });
+
+    // Wheel zoom (cursor-centered)
+    wrap.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = -e.deltaY;
+      const factor = delta > 0 ? 1.08 : 0.92;
+      zoomAt(e.clientX, e.clientY, factor);
+    }, { passive:false });
+
+    function zoomAt(clientX, clientY, factor){
+      const rect = wrap.getBoundingClientRect();
+      const xw = clientX - rect.left;
+      const yw = clientY - rect.top;
+
+      const { scale, tx, ty } = state.view;
+      const newScale = clamp(scale * factor, 0.25, 6);
+
+      const stageX = (xw - tx) / scale;
+      const stageY = (yw - ty) / scale;
+
+      snapshot();
+      state.view.scale = newScale;
+      state.view.tx = xw - newScale * stageX;
+      state.view.ty = yw - newScale * stageY;
+      applyView();
+      renderList();
+    }
+
+    function fitToView(){
+      snapshot();
+      state.view = { scale:1, tx:0, ty:0 };
+      applyView();
+    }
+
+    // Re-render markers when image loads or window resizes (contained rect changes)
+    mapImg.addEventListener('load', () => {
+      normalizeLegacyMarkersInPlace();
+      renderMarkers();
+      renderList();
+    });
+    window.addEventListener('resize', () => {
+      renderMarkers();
+      renderList();
+    });
+
+    // ---------- Modals ----------
+    let editingId = null;
+
+    function openEditModal(id){
+      const m = state.markers.find(mm => mm.id === id);
+      if (!m) return;
+      editingId = id;
+      editIdPill.textContent = `#${id}`;
+      editType.value = m.type;
+      editLabel.value = m.label || '';
+      modalBackdrop.style.display = 'flex';
+      modalBackdrop.setAttribute('aria-hidden','false');
+      editLabel.focus();
+      editLabel.select();
+    }
+
+    function closeEditModal(){
+      modalBackdrop.style.display = 'none';
+      modalBackdrop.setAttribute('aria-hidden','true');
+      editingId = null;
+    }
+
+    modalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBackdrop) closeEditModal();
+    });
+    closeModalBtn.addEventListener('click', closeEditModal);
+
+    saveMarkerBtn.addEventListener('click', () => {
+      const m = state.markers.find(mm => mm.id === editingId);
+      if (!m) return closeEditModal();
+      snapshot();
+      m.type = editType.value;
+      m.label = editLabel.value.trim();
+      renderMarkers();
+      renderList();
+      closeEditModal();
+    });
+
+    deleteMarkerBtn.addEventListener('click', () => {
+      if (editingId == null) return;
+      snapshot();
+      state.markers = state.markers.filter(mm => mm.id !== editingId);
+      renderMarkers();
+      renderList();
+      closeEditModal();
+    });
+
+    // JSON modal
+    function openJsonModal(text){
+      jsonText.value = text || '';
+      jsonBackdrop.style.display = 'flex';
+      jsonBackdrop.setAttribute('aria-hidden','false');
+      jsonText.focus();
+      jsonText.select();
+    }
+    function closeJsonModal(){
+      jsonBackdrop.style.display = 'none';
+      jsonBackdrop.setAttribute('aria-hidden','true');
+    }
+    jsonBackdrop.addEventListener('click', (e) => {
+      if (e.target === jsonBackdrop) closeJsonModal();
+    });
+    jsonCancel.addEventListener('click', closeJsonModal);
+
+    // ---------- UI events ----------
+    toolButtons.forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+    toggleGrid.addEventListener('change', () => {
+      state.showGrid = toggleGrid.checked;
+      applyGrid();
+    });
+
+    toggleLabels.addEventListener('change', () => {
+      state.showLabels = toggleLabels.checked;
+      renderMarkers();
+    });
+
+    fitBtn.addEventListener('click', fitToView);
+    zoomInBtn.addEventListener('click', () => zoomAt(wrap.getBoundingClientRect().left + wrap.clientWidth/2, wrap.getBoundingClientRect().top + wrap.clientHeight/2, 1.12));
+    zoomOutBtn.addEventListener('click', () => zoomAt(wrap.getBoundingClientRect().left + wrap.clientWidth/2, wrap.getBoundingClientRect().top + wrap.clientHeight/2, 0.88));
+    resetViewBtn.addEventListener('click', () => { snapshot(); state.view = { scale:1, tx:0, ty:0 }; applyView(); });
+
+    undoBtn.addEventListener('click', () => {
+      const snap = state.history.pop();
+      undoBtn.disabled = state.history.length === 0;
+      if (!snap) return;
+      restoreFromSnapshot(snap);
+    });
+
+    clearMarkersBtn.addEventListener('click', () => {
+      if (state.markers.length === 0) return;
+      snapshot();
+      state.markers = [];
+      renderMarkers(); renderList();
+    });
+
+    // Map import: object URL for display + data URL for export
+    mapFile.addEventListener('change', async () => {
+      const file = mapFile.files && mapFile.files[0];
+      if (!file) return;
+
+      snapshot();
+      state.map.fileName = file.name || '';
+      state.map.src = URL.createObjectURL(file);
+
+      try{
+        state.map.dataUrl = await readFileAsDataURL(file);
+      }catch(err){
+        state.map.dataUrl = '';
+        console.warn('Failed reading map as data URL:', err);
+      }
+
+      applyMap();
+      fitToView();
+    });
+
+    function readFileAsDataURL(file){
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    clearMapBtn.addEventListener('click', () => {
+      snapshot();
+      state.map.src = '';
+      state.map.fileName = '';
+      state.map.dataUrl = '';
+      mapFile.value = '';
+      applyMap();
+      renderMarkers(); renderList();
+    });
+
+    // Export / Import JSON (now includes u,v)
+    function exportLayout(){
+      return JSON.stringify({
+        version: 2,
+        createdAt: new Date().toISOString(),
+        map: { fileName: state.map.fileName || '' },
+        view: state.view,
+        markers: state.markers.map(m => ({
+          id: m.id,
+          type: m.type,
+          label: m.label,
+          u: m.u,
+          v: m.v
+        }))
+      }, null, 2);
+    }
+
+    exportJsonBtn.addEventListener('click', () => openJsonModal(exportLayout()));
+    copyJsonBtn.addEventListener('click', async () => {
+      const text = exportLayout();
+      try{
+        await navigator.clipboard.writeText(text);
+        openJsonModal(text);
+      }catch(_){
+        openJsonModal(text);
+      }
+    });
+
+    importJsonBtn.addEventListener('click', () => openJsonModal(''));
+
+    jsonApply.addEventListener('click', () => {
+      let obj;
+      try{
+        obj = JSON.parse(jsonText.value);
+      }catch(err){
+        jsonText.value = `Invalid JSON: ${err.message}\n\n` + jsonText.value;
+        return;
+      }
+      if (!obj || !Array.isArray(obj.markers) || !obj.view){
+        jsonText.value = 'JSON missing required fields: { view, markers }\n\n' + jsonText.value;
+        return;
+      }
+      snapshot();
+
+      state.markers = obj.markers.map(m => ({
+        id: Number(m.id),
+        type: (m.type === 'gen' || m.type === 'killer' || m.type === 'surv') ? m.type : 'gen',
+        label: String(m.label ?? ''),
+        // Prefer u,v; fall back to legacy x,y if provided
+        u: Number.isFinite(Number(m.u)) ? Number(m.u) : undefined,
+        v: Number.isFinite(Number(m.v)) ? Number(m.v) : undefined,
+        x: Number.isFinite(Number(m.x)) ? Number(m.x) : undefined,
+        y: Number.isFinite(Number(m.y)) ? Number(m.y) : undefined
+      })).filter(m => Number.isFinite(m.id));
+
+      // clamp u,v if present
+      for (const m of state.markers){
+        if (Number.isFinite(m.u)) m.u = clamp(m.u, 0, 1);
+        if (Number.isFinite(m.v)) m.v = clamp(m.v, 0, 1);
+      }
+
+      const maxId = state.markers.reduce((a,m)=>Math.max(a,m.id), 0);
+      state.nextId = Math.max(maxId + 1, 1);
+
+      state.view = {
+        scale: clamp(Number(obj.view.scale ?? 1), 0.25, 6),
+        tx: Number(obj.view.tx ?? 0),
+        ty: Number(obj.view.ty ?? 0)
+      };
+
+      state.map.fileName = String(obj.map?.fileName ?? state.map.fileName ?? '');
+
+      normalizeLegacyMarkersInPlace();
+      applyView();
+      renderMarkers();
+      renderList();
+      closeJsonModal();
+    });
+
+    // ---------- Export Shareable HTML (uses u,v so it always aligns) ----------
+    exportShareHtmlBtn.addEventListener('click', () => {
+      if (!state.map.dataUrl) {
+        const ok = confirm(
+          "No embedded map image found.\n\n" +
+          "To embed the map, re-import the map image via the file picker first.\n\n" +
+          "Export anyway (markers/view only)?"
+        );
+        if (!ok) return;
+      }
+
+      // Ensure markers have u,v
+      normalizeLegacyMarkersInPlace();
+
+      const payload = {
+        version: 2,
+        createdAt: new Date().toISOString(),
+        embedded: {
+          mapDataUrl: state.map.dataUrl || '',
+          mapFileName: state.map.fileName || ''
+        },
+        view: state.view,
+        markers: state.markers.map(m => ({ id:m.id, type:m.type, label:m.label, u:m.u, v:m.v })),
+        settings: { showGrid: state.showGrid, showLabels: state.showLabels }
+      };
+
+      const html = buildShareableHtml(payload);
+      const suggestedName = makeSafeFileName(
+        `dbd-board-${(state.map.fileName || 'map').replace(/\.[^.]+$/,'')}-${new Date().toISOString().slice(0,10)}.html`
+      );
+      downloadTextFile(html, suggestedName, 'text/html;charset=utf-8');
+    });
+
+    function makeSafeFileName(name){
+      return name.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g,' ').trim();
+    }
+
+    function downloadTextFile(text, filename, mime){
+      const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+    }
+
+    function buildShareableHtml(payload){
+      const data = JSON.stringify(payload).replace(/</g, '\\u003c');
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DBD Strategy Board (Shared)</title>
+  <style>
+    body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b0f17; color:#e6edf7; }
+    header{ padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.10); background: rgba(0,0,0,.25); position:sticky; top:0; }
+    header .small{ font-size:12px; color:#9fb0cc; }
+    main{ padding:14px; }
+    .wrap{
+      position:relative; width:100%;
+      height: min(70vh, 760px);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+      overflow:hidden;
+      background:
+        linear-gradient(#22304d 1px, transparent 1px),
+        linear-gradient(90deg, #22304d 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .stage{ position:absolute; inset:0; transform-origin:0 0; }
+    img.map{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; user-select:none; background: rgba(0,0,0,.18); }
+    .marker{
+      position:absolute; transform: translate(-50%,-50%);
+      width:28px; height:28px; border-radius:999px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:900; border:2px solid rgba(0,0,0,.45);
+      box-shadow:0 6px 14px rgba(0,0,0,.28);
+      user-select:none;
+    }
+    .marker.gen{ background: rgba(255,204,102,.95); }
+    .marker.killer{ background: rgba(255,92,122,.92); }
+    .marker.surv{ background: rgba(49,208,127,.92); }
+    .tag{
+      position:absolute;
+      top:-10px; left:16px; transform: translateY(-100%);
+      font-size:11px; font-weight:800;
+      padding:3px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.55);
+      white-space:nowrap;
+    }
+    .bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px; }
+    button{
+      border-radius:12px; padding:10px 12px; cursor:pointer;
+      background: rgba(255,255,255,.10); color:#e6edf7;
+      border:1px solid rgba(255,255,255,.12);
+      font-weight:750;
+    }
+    button:hover{ background: rgba(255,255,255,.14); }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-weight:800;">DBD Strategy Board (Shared)</div>
+    <div class="small">This file contains an embedded map image + marker layout.</div>
+  </header>
+
+  <main>
+    <div class="wrap" id="wrap">
+      <div class="stage" id="stage">
+        <img class="map" id="mapImg" alt="Map" />
+        <div id="layer"></div>
+      </div>
+    </div>
+
+    <div class="bar">
+      <button id="fit">Fit</button>
+      <button id="zoomIn">Zoom +</button>
+      <button id="zoomOut">Zoom −</button>
+      <button id="reset">Reset view</button>
+      <button id="copyJson">Copy embedded layout JSON</button>
+      <span style="font-size:12px;color:#9fb0cc;">Tip: Space+drag to pan, wheel to zoom.</span>
+    </div>
+
+    <pre id="warn" style="margin-top:12px; white-space:pre-wrap; font-size:12px; color:#ffcc66;"></pre>
+  </main>
+
+  <script>
+    const payload = ${data};
+
+    const wrap = document.getElementById('wrap');
+    const stage = document.getElementById('stage');
+    const layer = document.getElementById('layer');
+    const mapImg = document.getElementById('mapImg');
+    const warn = document.getElementById('warn');
+
+    const state = {
+      view: payload.view || { scale:1, tx:0, ty:0 },
+      markers: payload.markers || [],
+      showGrid: payload.settings?.showGrid !== false,
+      showLabels: payload.settings?.showLabels !== false
+    };
+
+    function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+    function applyView(){
+      const {scale,tx,ty} = state.view;
+      stage.style.transform = \`translate(\${tx}px, \${ty}px) scale(\${scale})\`;
+    }
+
+    function applyGrid(){
+      wrap.style.background = state.showGrid
+        ? 'linear-gradient(#22304d 1px, transparent 1px), linear-gradient(90deg, #22304d 1px, transparent 1px)'
+        : 'rgba(0,0,0,.16)';
+      wrap.style.backgroundSize = state.showGrid ? '40px 40px' : 'auto';
+    }
+
+    function markerEmoji(type){
+      if (type === 'gen') return 'G';
+      if (type === 'killer') return 'K';
+      return 'S';
+    }
+
+    function markerClass(type){
+      if (type === 'gen') return 'gen';
+      if (type === 'killer') return 'killer';
+      return 'surv';
+    }
+
+    function getContainedImageRect(){
+      const W = wrap.clientWidth;
+      const H = wrap.clientHeight;
+      const iw = mapImg.naturalWidth || W || 1;
+      const ih = mapImg.naturalHeight || H || 1;
+      const s = Math.min(W / iw, H / ih);
+      const w = iw * s;
+      const h = ih * s;
+      const x = (W - w) / 2;
+      const y = (H - h) / 2;
+      return { x, y, w, h };
+    }
+
+    function stagePointFromUV(u,v){
+      const r = getContainedImageRect();
+      return { x: r.x + u * r.w, y: r.y + v * r.h };
+    }
+
+    function render(){
+      layer.innerHTML = '';
+      for (const m of state.markers){
+        const el = document.createElement('div');
+        el.className = 'marker ' + markerClass(m.type);
+        const u = (typeof m.u === 'number') ? clamp(m.u,0,1) : 0.5;
+        const v = (typeof m.v === 'number') ? clamp(m.v,0,1) : 0.5;
+        const pt = stagePointFromUV(u,v);
+        el.style.left = pt.x + 'px';
+        el.style.top = pt.y + 'px';
+        el.textContent = markerEmoji(m.type);
+
+        const tag = document.createElement('div');
+        tag.className = 'tag';
+        tag.textContent = m.label || '';
+        tag.style.display = state.showLabels ? 'block' : 'none';
+        el.appendChild(tag);
+
+        layer.appendChild(el);
+      }
+    }
+
+    function zoomAt(clientX, clientY, factor){
+      const rect = wrap.getBoundingClientRect();
+      const xw = clientX - rect.left;
+      const yw = clientY - rect.top;
+
+      const {scale,tx,ty} = state.view;
+      const newScale = clamp(scale*factor, 0.25, 6);
+
+      const stageX = (xw - tx)/scale;
+      const stageY = (yw - ty)/scale;
+
+      state.view.scale = newScale;
+      state.view.tx = xw - newScale * stageX;
+      state.view.ty = yw - newScale * stageY;
+      applyView();
+    }
+
+    function fit(){
+      state.view = { scale:1, tx:0, ty:0 };
+      applyView();
+    }
+
+    // Pan (Space+drag)
+    let keys = new Set();
+    window.addEventListener('keydown', (e)=>{ keys.add(e.code); if (e.code==='Space') e.preventDefault(); }, {passive:false});
+    window.addEventListener('keyup', (e)=>keys.delete(e.code));
+    function isPanningMode(e){ return keys.has('Space') || e.button===1; }
+
+    let pan = { active:false, sx:0, sy:0, ox:0, oy:0 };
+    wrap.addEventListener('pointerdown', (e)=>{
+      if (!isPanningMode(e)) return;
+      e.preventDefault();
+      wrap.setPointerCapture(e.pointerId);
+      pan.active = true;
+      pan.sx = e.clientX; pan.sy = e.clientY;
+      pan.ox = state.view.tx; pan.oy = state.view.ty;
+    });
+    wrap.addEventListener('pointermove', (e)=>{
+      if (!pan.active) return;
+      const dx = e.clientX - pan.sx;
+      const dy = e.clientY - pan.sy;
+      state.view.tx = pan.ox + dx;
+      state.view.ty = pan.oy + dy;
+      applyView();
+    });
+    wrap.addEventListener('pointerup', (e)=>{
+      if (!pan.active) return;
+      pan.active = false;
+      try{ wrap.releasePointerCapture(e.pointerId); }catch(_){}
+    });
+
+    // Wheel zoom
+    wrap.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      const factor = (-e.deltaY) > 0 ? 1.08 : 0.92;
+      zoomAt(e.clientX, e.clientY, factor);
+    }, {passive:false});
+
+    document.getElementById('fit').addEventListener('click', fit);
+    document.getElementById('zoomIn').addEventListener('click', ()=>{
+      const r = wrap.getBoundingClientRect();
+      zoomAt(r.left + r.width/2, r.top + r.height/2, 1.12);
+    });
+    document.getElementById('zoomOut').addEventListener('click', ()=>{
+      const r = wrap.getBoundingClientRect();
+      zoomAt(r.left + r.width/2, r.top + r.height/2, 0.88);
+    });
+    document.getElementById('reset').addEventListener('click', fit);
+
+    document.getElementById('copyJson').addEventListener('click', async ()=>{
+      const json = JSON.stringify(payload, null, 2);
+      try{
+        await navigator.clipboard.writeText(json);
+        warn.textContent = 'Copied embedded JSON to clipboard.';
+        setTimeout(()=> warn.textContent = '', 1200);
+      }catch(_){
+        warn.textContent = json;
+      }
+    });
+
+    if (payload.embedded && payload.embedded.mapDataUrl){
+      mapImg.src = payload.embedded.mapDataUrl;
+      mapImg.addEventListener('load', () => { render(); });
+    } else {
+      warn.textContent =
+        'Warning: This shared file did NOT include an embedded map image.\\n' +
+        'Ask the sender to re-import the map image, then Export Shareable HTML again.';
+    }
+
+    window.addEventListener('resize', render);
+
+    // Init
+    applyGrid();
+    applyView();
+    render();
+  <\/script>
+</body>
+</html>`;
+    }
+
+    // ---------- Init ----------
+    setTool('gen');
+    applyView();
+    applyMap();
+    applyGrid();
+    renderMarkers();
+    renderList();
+    undoBtn.disabled = true;
+  </script>
+
+
+</body></html>
